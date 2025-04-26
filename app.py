@@ -64,11 +64,22 @@ def backtest_fgi_strategy(df, buy_threshold, sell_threshold, initial_capital=10_
     return final, roi, dates, portfolio
 
 # Streamlit UI
-st.title("FGI Strategy Genetic Optimization - Fixed")
+st.title("FGI Strategy App - Updated")
+
+# GA integration stub
+use_ga = st.sidebar.checkbox("Use GA Optimization", value=False)
+if use_ga:
+    st.sidebar.subheader("GA Parameters")
+    pop_size = st.sidebar.number_input("Population Size", 10, 200, 50, step=10)
+    gens = st.sidebar.number_input("Generations", 10, 200, 80, step=10)
+    mut_rate = st.sidebar.slider("Mutation Rate", 0.0, 1.0, 0.25, 0.01)
+    parent_count = st.sidebar.number_input("Parents Count", 2, pop_size, int(pop_size*0.25))
+    run_label = "Run GA Backtest"
+else:
+    run_label = "Run Single Backtest"
 
 uploaded_file = st.file_uploader("Upload CSV/XLSX file", type=['csv','xls','xlsx'])
 if uploaded_file:
-    # Load DataFrame
     if uploaded_file.name.endswith('.csv'):
         df = pd.read_csv(uploaded_file)
     else:
@@ -79,7 +90,6 @@ if uploaded_file:
     price_col = st.selectbox("Select price column", cols)
     fgi_col = st.selectbox("Select FGI column", cols)
 
-    # Subset and rename columns explicitly
     df = df[[date_col, price_col, fgi_col]].copy()
     df.columns = ['date', 'price', 'fgi']
     df['date'] = pd.to_datetime(df['date'])
@@ -91,40 +101,49 @@ if uploaded_file:
     initial_capital = st.number_input("Initial capital (KRW)", value=10000000)
     commission_rate = st.number_input("Commission rate", value=0.0025, format="%.4f")
 
-    buy_threshold = st.slider("Buy threshold", int(df['fgi'].min()), int(df['fgi'].max()), 5)
-    sell_threshold = st.slider("Sell threshold", int(df['fgi'].min()), int(df['fgi'].max()), 13)
+    if not use_ga:
+        buy_threshold = st.slider("Buy threshold", int(df['fgi'].min()), int(df['fgi'].max()), 5)
+        sell_threshold = st.slider("Sell threshold", int(df['fgi'].min()), int(df['fgi'].max()), 13)
 
-    if st.button("Run Backtest"):
-        final, roi, dates, portfolio = backtest_fgi_strategy(df, buy_threshold, sell_threshold, initial_capital, commission_rate)
-        final_value = float(final)
-        roi_value = float(roi)
+    if st.button(run_label):
+        if use_ga:
+            # GA optimization call (user implements run_genetic_algorithm)
+            st.info("GA optimization is not implemented in this stub.")
+        else:
+            final, roi, dates, portfolio = backtest_fgi_strategy(
+                df, buy_threshold, sell_threshold, initial_capital, commission_rate
+            )
+            final_value = float(final)
+            roi_value = float(roi)
 
-        st.write(f"Final value: {final_value:,.0f} KRW")
-        st.write(f"ROI: {roi_value:.2%}")
+            st.write(f"Final value: {final_value:,.0f} KRW")
+            st.write(f"ROI: {roi_value:.2%}")
 
-        fig, ax = plt.subplots()
-        ax.plot(dates, portfolio)
-        ax.set_title("Portfolio Value Over Time")
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Value")
-        ax.grid(True)
-        st.pyplot(fig)
+            fig, ax = plt.subplots()
+            ax.plot(dates, portfolio)
+            ax.set_title("Portfolio Value Over Time")
+            ax.set_xlabel("Date")
+            ax.set_ylabel("Value")
+            ax.grid(True)
+            st.pyplot(fig)
 
-        # PDF report
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial",'B',16)
-        pdf.cell(0,10,"FGI Strategy Backtest Report",0,1,'C')
-        pdf.ln(10)
-        pdf.set_font("Arial",'',12)
-        pdf.cell(0,8,f"Buy threshold: {buy_threshold}",0,1)
-        pdf.cell(0,8,f"Sell threshold: {sell_threshold}",0,1)
-        pdf.cell(0,8,f"Initial capital: {initial_capital}",0,1)
-        pdf.cell(0,8,f"Final value: {final_value:,.0f}",0,1)
-        pdf.cell(0,8,f"ROI: {roi_value:.2%}",0,1)
-        now = datetime.now().strftime("%Y%m%d_%H%M%S")
-        report_path = f"/mnt/data/report_fixed_{now}.pdf"
-        pdf.output(report_path)
-
-        with open(report_path, "rb") as f:
-            st.download_button("Download PDF Report", data=f, file_name=os.path.basename(report_path), mime="application/pdf")
+            # PDF in-memory
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial",'B',16)
+            pdf.cell(0,10,"FGI Strategy Backtest Report",0,1,'C')
+            pdf.ln(10)
+            pdf.set_font("Arial",'',12)
+            pdf.cell(0,8,f"Buy threshold: {buy_threshold}",0,1)
+            pdf.cell(0,8,f"Sell threshold: {sell_threshold}",0,1)
+            pdf.cell(0,8,f"Initial capital: {initial_capital}",0,1)
+            pdf.cell(0,8,f"Final value: {final_value:,.0f}",0,1)
+            pdf.cell(0,8,f"ROI: {roi_value:.2%}",0,1)
+            now = datetime.now().strftime("%Y%m%d_%H%M%S")
+            pdf_bytes = pdf.output(dest='S').encode('latin-1')
+            st.download_button(
+                "Download PDF Report",
+                data=pdf_bytes,
+                file_name=f"report_{now}.pdf",
+                mime="application/pdf"
+            )
